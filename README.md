@@ -13,8 +13,6 @@ vagrant plugin install hostmanager
 
 ```shell
 vagrant up
-# run vagrant halt to add CLUSTER_SWITCH to your vms
-vagrant halt
 ```
 
 # From machine where you run ansible
@@ -24,6 +22,11 @@ https://docs.ceph.com/projects/ceph-ansible/en/latest/
 git clone https://github.com/ceph/ceph-ansible.git
 cd ceph-ansible
 git checkout stable-7.0
+
+# install pip
+sudo apt update
+sudo apt install -y python3-pip
+
 pip install -r requirements.txt
 
 sudo add-apt-repository ppa:ansible/ansible
@@ -66,6 +69,7 @@ devices:
   - /dev/sdc
 ```
 
+copy inventories dir from ceph-hv to ceph-ansible
 
 ````shell
 ansible -i inventories/hyperv all -m ping

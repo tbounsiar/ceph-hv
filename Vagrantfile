@@ -22,6 +22,23 @@ network:
         - ADDRESS
 EOL
 "
+# TRY to create Hyper-V virtual Switches if not exists
+# Comment this section if you have trouble or you want to use existing switches
+if ARGV[0] == "up"
+  begin
+    physical_adapters = list_physical_net_adapter
+    physical_adapter = physical_adapters.find { |adapter| adapter["status"] == "Up" }
+    unless switch_index(PUBLIC_SWITCH, "External", physical_adapter["description"])
+      create_switch(PUBLIC_SWITCH, "External", physical_adapter["description"])
+    end
+    unless switch_index(CLUSTER_SWITCH, "Private")
+      create_switch(CLUSTER_SWITCH, "Private")
+    end
+  rescue StandardError
+    puts StandardError
+    return
+  end
+end
 
 Vagrant.configure("2") do |config|
 
@@ -36,8 +53,8 @@ Vagrant.configure("2") do |config|
   end
 
   config.hostmanager.enabled = true
-  # config.hostmanager.manage_host = true # uncomment if you use your host to run ansible
-  config.hostmanager.manage_guest = true
+  config.hostmanager.manage_host = false # put true if you use your host to run ansible
+  config.hostmanager.manage_guest = false # put true if you use vm to run ansible
   config.hostmanager.ignore_private_ip = false
   config.hostmanager.include_offline = true
 
@@ -51,24 +68,35 @@ Vagrant.configure("2") do |config|
       node.vm.provider :hyperv do |hv|
         hv.vmname = name
         # CHECK YOUR VIRTUAL SWITCH MANAGER RANGE IN YOUR HYPER-V
-        hv.mac = "00155D38010#{i}"
+        hv.mac = "00155D38010#{i - 1}"
       end
 
-      # after HALT
-      node.trigger.after :halt, type: :action do |trigger|
+      node.vm.network :public_network, bridge: PUBLIC_SWITCH
 
+      node.trigger.after :all do |trigger|
+        trigger.ruby do |env, machine|
+          puts machine.config.vm.disks
+          machine.config.vm.disks.each do |disk|
+            puts disk.provider_config
+          end
+        end
+      end
+
+      # AFTER VagrantPlugins::HyperV::Action::Configure
+      node.trigger.after :"VagrantPlugins::HyperV::Action::Configure", type: :action do |trigger|
         trigger.ruby do |env, machine|
           if "#{machine.provider_name}" == "hyperv"
+            # Add CLUSTER_SWITCH adapter
             unless list_net_adapter(name).any? { |adapter| adapter["switch_name"] == CLUSTER_SWITCH }
               # CHECK YOUR VIRTUAL SWITCH MANAGER RANGE IN YOUR HYPER-V
-              add_net_adapter(name, CLUSTER_SWITCH, "00155D38011#{i}")
+              add_net_adapter(name, CLUSTER_SWITCH, "00155D38011#{i - 1}")
             end
           end
         end
       end
 
-      # AFTER UP
-      node.trigger.before :provision, type: :action do |trigger|
+      # AFTER PROVISION
+      node.trigger.after :provisioner_run, type: :hook do |trigger|
 
         trigger.ruby do |env, machine|
           if "#{machine.provider_name}" == "hyperv"
@@ -100,55 +128,55 @@ Vagrant.configure("2") do |config|
     end
   end
 
-  config.vm.define "ansible" do |ansible|
-
-    ansible.vm.hostname = "ansible"
-    # Hyper-V
-    ansible.vm.provider :hyperv do |hv|
-      hv.vmname = "ansible"
-      # CHECK YOUR VIRTUAL SWITCH MANAGER RANGE IN YOUR HYPER-V
-      hv.mac = "00155D380120"
-    end
-    # disable ipv6
-    ansible.vm.provision "shell", inline: "sysctl -w net.ipv6.conf.all.disable_ipv6=1"
-
-    # add ssh keys ans config
-    ansible.vm.provision "shell" do |shell|
-      ssh_priv_key = File.read("ssh/id_rsa_vagrant").strip
-      config = File.read("ssh/config").strip
-      ansible_nodes = File.read("ssh/config.d/ansible_nodes").strip
-      shell.inline = <<-SHELL
-mkdir -p /home/vagrant/.ssh/config.d
-cat <<EOL > /home/vagrant/.ssh/id_rsa_vagrant.pub
-#{ssh_pub_key}
-EOL
-
-cat <<EOL > /home/vagrant/.ssh/id_rsa_vagrant
-#{ssh_priv_key}
-EOL
-
-chmod 600 /home/vagrant/.ssh/id_rsa_vagrant.pub
-chmod 600 /home/vagrant/.ssh/id_rsa_vagrant
-chown vagrant: /home/vagrant/.ssh/id_rsa_vagrant.pub
-chown vagrant: /home/vagrant/.ssh/id_rsa_vagrant
-
-cat <<EOL > /home/vagrant/.ssh/config
-#{config}
-EOL
-
-cat <<EOL > /home/vagrant/.ssh/config.d/ansible_nodes
-#{ansible_nodes}
-EOL
-      SHELL
-    end
-    # install pip
-    ansible.vm.provision "shell" do |shell|
-      # install apt install python3-pip
-      shell.inline = <<-SHELL
-        add-apt-repository -y ppa:ansible/ansible
-        apt update
-        apt install -y python3-pip
-      SHELL
-    end
-  end
+  #   config.vm.define "ansible" do |ansible|
+  #
+  #     ansible.vm.hostname = "ansible"
+  #     # Hyper-V
+  #     ansible.vm.provider :hyperv do |hv|
+  #       hv.vmname = "ansible"
+  #       # CHECK YOUR VIRTUAL SWITCH MANAGER RANGE IN YOUR HYPER-V
+  #       hv.mac = "00155D380120"
+  #     end
+  #     # disable ipv6
+  #     ansible.vm.provision "shell", inline: "sysctl -w net.ipv6.conf.all.disable_ipv6=1"
+  #
+  #     # add ssh keys ans config
+  #     ansible.vm.provision "shell" do |shell|
+  #       ssh_priv_key = File.read("ssh/id_rsa_vagrant").strip
+  #       config = File.read("ssh/config").strip
+  #       ansible_nodes = File.read("ssh/config.d/ansible_nodes").strip
+  #       shell.inline = <<-SHELL
+  # mkdir -p /home/vagrant/.ssh/config.d
+  # cat <<EOL > /home/vagrant/.ssh/id_rsa_vagrant.pub
+  # #{ssh_pub_key}
+  # EOL
+  #
+  # cat <<EOL > /home/vagrant/.ssh/id_rsa_vagrant
+  # #{ssh_priv_key}
+  # EOL
+  #
+  # chmod 600 /home/vagrant/.ssh/id_rsa_vagrant.pub
+  # chmod 600 /home/vagrant/.ssh/id_rsa_vagrant
+  # chown vagrant: /home/vagrant/.ssh/id_rsa_vagrant.pub
+  # chown vagrant: /home/vagrant/.ssh/id_rsa_vagrant
+  #
+  # cat <<EOL > /home/vagrant/.ssh/config
+  # #{config}
+  # EOL
+  #
+  # cat <<EOL > /home/vagrant/.ssh/config.d/ansible_nodes
+  # #{ansible_nodes}
+  # EOL
+  #       SHELL
+  #     end
+  #     # install pip
+  #     ansible.vm.provision "shell" do |shell|
+  #       # install apt install python3-pip
+  #       shell.inline = <<-SHELL
+  #         add-apt-repository -y ppa:ansible/ansible
+  #         apt update
+  #         apt install -y python3-pip
+  #       SHELL
+  #     end
+  #   end
 end
