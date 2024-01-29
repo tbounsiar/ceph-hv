@@ -3,7 +3,6 @@
 Clone vagrant project
 ```shell
 git clone https://github.com/tbounsiar/ceph-hv.git
-# git clone https://github.com/tbounsiar/ceph-vb.git # for virtualbox
 ```
 
 Install vagrant hostmanager plugin
@@ -14,7 +13,7 @@ vagrant plugin install hostmanager
 
 ```shell
 vagrant up
-# Only if you use hyper-v run vagrant halt to add CLUSTER_SWITCH to your vms
+# run vagrant halt to add CLUSTER_SWITCH to your vms
 vagrant halt
 ```
 
@@ -46,7 +45,7 @@ ceph_repository: community
 ceph_stable_release: pacific
 monitor_interface: eth0
 journal_size: 1024
-public_network: 192.168.1.0/24 # public_network: 192.168.11.0/24
+public_network: 192.168.1.0/24
 cluster_network: 192.168.10.0/24
 dashboard_enabled: True
 dashboard_admin_user: admin
