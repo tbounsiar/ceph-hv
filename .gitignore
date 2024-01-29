@@ -2,4 +2,3 @@
 .vagrant
 *.iml
 *.rb
-ssh/config.d/ansible_nodes
