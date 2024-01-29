@@ -53,7 +53,7 @@ Vagrant.configure("2") do |config|
   end
 
   config.hostmanager.enabled = true
-  config.hostmanager.manage_host = true # put true if you use your host to run ansible
+  config.hostmanager.manage_host = false # put true if you use your host to run ansible
   config.hostmanager.manage_guest = false # put true if you use vm to run ansible
   config.hostmanager.ignore_private_ip = false
   config.hostmanager.include_offline = true
@@ -63,33 +63,24 @@ Vagrant.configure("2") do |config|
     cluster_ip = "#{CLUSTER_SUBNET}.1#{i}/24"
     config.vm.define name do |node|
       node.vm.hostname = name
-
+      digit = i - 1
       # Hyper-V
       node.vm.provider :hyperv do |hv|
         hv.vmname = name
         # CHECK YOUR VIRTUAL SWITCH MANAGER RANGE IN YOUR HYPER-V
-        hv.mac = "00155D38010#{i - 1}"
+        hv.mac = "00155D38010#{digit}"
       end
 
-      node.vm.network :public_network, bridge: PUBLIC_SWITCH
-
-      node.trigger.after :all do |trigger|
-        trigger.ruby do |env, machine|
-          puts machine.config.vm.disks
-          machine.config.vm.disks.each do |disk|
-            puts disk.provider_config
-          end
-        end
-      end
+      node.vm.network :public_network, bridge: PUBLIC_SWITCH, type: "dhcp"
 
       # AFTER VagrantPlugins::HyperV::Action::Configure
-      node.trigger.after :"VagrantPlugins::HyperV::Action::Configure", type: :action do |trigger|
+      node.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |trigger|
         trigger.ruby do |env, machine|
           if "#{machine.provider_name}" == "hyperv"
             # Add CLUSTER_SWITCH adapter
             unless list_net_adapter(name).any? { |adapter| adapter["switch_name"] == CLUSTER_SWITCH }
               # CHECK YOUR VIRTUAL SWITCH MANAGER RANGE IN YOUR HYPER-V
-              add_net_adapter(name, CLUSTER_SWITCH, "00155D38011#{i - 1}")
+              add_net_adapter(name, CLUSTER_SWITCH, "00155D38011#{digit}")
             end
           end
         end
