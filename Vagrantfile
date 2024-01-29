@@ -53,7 +53,7 @@ Vagrant.configure("2") do |config|
   end
 
   config.hostmanager.enabled = true
-  config.hostmanager.manage_host = false # put true if you use your host to run ansible
+  config.hostmanager.manage_host = true # put true if you use your host to run ansible
   config.hostmanager.manage_guest = false # put true if you use vm to run ansible
   config.hostmanager.ignore_private_ip = false
   config.hostmanager.include_offline = true
@@ -128,7 +128,8 @@ Vagrant.configure("2") do |config|
     end
   end
 
-  #   config.vm.define "ansible" do |ansible|
+  # uncomment if you want to use vm to run ansible
+  # config.vm.define "ansible" do |ansible|
   #
   #     ansible.vm.hostname = "ansible"
   #     # Hyper-V
@@ -170,13 +171,13 @@ Vagrant.configure("2") do |config|
   #       SHELL
   #     end
   #     # install pip
-  #     ansible.vm.provision "shell" do |shell|
+  #   ansible.vm.provision "shell" do |shell|
   #       # install apt install python3-pip
-  #       shell.inline = <<-SHELL
-  #         add-apt-repository -y ppa:ansible/ansible
-  #         apt update
-  #         apt install -y python3-pip
-  #       SHELL
-  #     end
+  #     shell.inline = <<-SHELL
+  #       add-apt-repository -y ppa:ansible/ansible
+  #       apt update
+  #       apt install -y python3-pip
+  #     SHELL
   #   end
+  # end
 end
